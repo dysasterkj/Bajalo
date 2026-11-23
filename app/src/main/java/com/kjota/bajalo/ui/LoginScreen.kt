@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.doOnLayout
 import com.kjota.bajalo.engine.Site
 
 /**
@@ -61,6 +62,7 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
     var web by remember { mutableStateOf<WebView?>(null) }
     var jsError by remember { mutableStateOf<String?>(null) }
     var showDiag by remember { mutableStateOf(false) }
+    var viewport by remember { mutableStateOf("?") }
 
     Column(
         modifier = Modifier
@@ -104,11 +106,14 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             androidx.compose.material3.TextButton(onClick = { error = null; web?.reload() }) { Text("Recargar") }
-            androidx.compose.material3.TextButton(onClick = { showDiag = !showDiag }) { Text("Diagnóstico") }
+            androidx.compose.material3.TextButton(onClick = {
+                showDiag = !showDiag
+                web?.evaluateJavascript("window.innerWidth+'x'+window.innerHeight") { viewport = it ?: "?" }
+            }) { Text("Diagnóstico") }
         }
         if (showDiag) {
             Text(
-                text = "Progreso $progress%. Último error de la página: ${jsError ?: "ninguno"}",
+                text = "Progreso $progress%. Pantalla vista por la página: $viewport. Último error: ${jsError ?: "ninguno"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = Glass.Soft,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -124,7 +129,6 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.javaScriptCanOpenWindowsAutomatically = true
-                        settings.loadWithOverviewMode = true
                         settings.databaseEnabled = true
                         settings.cacheMode = WebSettings.LOAD_DEFAULT
                         settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
@@ -137,8 +141,6 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
                             @Suppress("DEPRECATION")
                             settings.forceDark = WebSettings.FORCE_DARK_OFF
                         }
-                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                        settings.useWideViewPort = true
                         // Mismo navegador del teléfono, pero sin la marca de "WebView" que
                         // hace que Instagram y Facebook se nieguen a cargar.
                         settings.userAgentString = settings.userAgentString
@@ -194,7 +196,9 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
                             }
                         }
                         web = this
-                        loadUrl(site.loginUrl)
+                        // Se carga recién cuando el cuadro ya tiene su tamaño real; si no, la
+                        // página cree que la pantalla mide casi cero y se dibuja en una franja.
+                        doOnLayout { loadUrl(site.loginUrl) }
                     }
                 },
             )
