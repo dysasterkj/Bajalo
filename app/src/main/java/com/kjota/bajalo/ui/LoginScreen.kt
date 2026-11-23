@@ -4,7 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebSettings
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -55,6 +59,8 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
     var progress by remember { mutableIntStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }
     var web by remember { mutableStateOf<WebView?>(null) }
+    var jsError by remember { mutableStateOf<String?>(null) }
+    var showDiag by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -91,6 +97,24 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
             )
         }
 
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            androidx.compose.material3.TextButton(onClick = { error = null; web?.reload() }) { Text("Recargar") }
+            androidx.compose.material3.TextButton(onClick = { showDiag = !showDiag }) { Text("Diagnóstico") }
+        }
+        if (showDiag) {
+            Text(
+                text = "Progreso $progress%. Último error de la página: ${jsError ?: "ninguno"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Glass.Soft,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+
         Box(Modifier.weight(1f).fillMaxWidth()) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
@@ -101,6 +125,19 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
                         settings.domStorageEnabled = true
                         settings.javaScriptCanOpenWindowsAutomatically = true
                         settings.loadWithOverviewMode = true
+                        settings.databaseEnabled = true
+                        settings.cacheMode = WebSettings.LOAD_DEFAULT
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                        settings.mediaPlaybackRequiresUserGesture = true
+                        // La app es oscura, y Android intentaba oscurecer también la página
+                        // del sitio, dejándola negra. Se desactiva.
+                        if (Build.VERSION.SDK_INT >= 33) {
+                            settings.isAlgorithmicDarkeningAllowed = false
+                        } else if (Build.VERSION.SDK_INT >= 29) {
+                            @Suppress("DEPRECATION")
+                            settings.forceDark = WebSettings.FORCE_DARK_OFF
+                        }
+                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                         settings.useWideViewPort = true
                         // Mismo navegador del teléfono, pero sin la marca de "WebView" que
                         // hace que Instagram y Facebook se nieguen a cargar.
@@ -115,6 +152,13 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                 progress = newProgress
                             }
+
+                            override fun onConsoleMessage(m: ConsoleMessage?): Boolean {
+                                if (m?.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                                    jsError = m.message().take(160)
+                                }
+                                return true
+                            }
                         }
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(
@@ -125,6 +169,14 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
                                 // Instagram/Facebook intentan abrir su app (intent://, fb://…):
                                 // se bloquea para que la página siga cargando aquí.
                                 return scheme != "http" && scheme != "https"
+                            }
+
+                            override fun onRenderProcessGone(
+                                view: WebView?,
+                                detail: RenderProcessGoneDetail?,
+                            ): Boolean {
+                                error = "El navegador interno se detuvo."
+                                return true
                             }
 
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {

@@ -2,6 +2,8 @@ package com.kjota.bajalo.ui
 
 import android.widget.VideoView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,9 +20,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -62,11 +74,49 @@ fun StatusViewer(file: StatusFile, onClose: () -> Unit, onSave: () -> Unit) {
                     },
                 )
             } else {
+                var scale by remember { mutableFloatStateOf(1f) }
+                var offset by remember { mutableStateOf(Offset.Zero) }
+                var box by remember { mutableStateOf(IntSize.Zero) }
                 AsyncImage(
                     model = file.uri,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onSizeChanged { box = it }
+                        .pointerInput(Unit) {
+                            // Pellizcar para ampliar o reducir; arrastrar para moverse al ampliar.
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 6f)
+                                val maxX = box.width * (scale - 1f) / 2f
+                                val maxY = box.height * (scale - 1f) / 2f
+                                offset = if (scale <= 1f) {
+                                    Offset.Zero
+                                } else {
+                                    Offset(
+                                        (offset.x + pan.x * scale).coerceIn(-maxX, maxX),
+                                        (offset.y + pan.y * scale).coerceIn(-maxY, maxY),
+                                    )
+                                }
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            // Doble toque: acerca o vuelve a la normalidad.
+                            detectTapGestures(onDoubleTap = {
+                                if (scale > 1f) {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                } else {
+                                    scale = 2.5f
+                                }
+                            })
+                        }
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offset.x,
+                            translationY = offset.y,
+                        ),
                 )
             }
 
