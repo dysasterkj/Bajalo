@@ -12,12 +12,25 @@ android {
         applicationId = "com.kjota.bajalo"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // En GitHub cada compilación sube el número de versión; en tu PC queda en 1.
+        val build = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+        versionCode = build
+        versionName = "1.0.$build"
 
         // Solo celulares reales (ARM). Reduce bastante el tamaño del APK.
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+        }
+    }
+
+    // Llave de firma fija (la misma en todas las compilaciones) para que cada APK nuevo
+    // se instale como actualización encima del anterior, sin desinstalar.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("bajalo.keystore")
+            storePassword = "bajalo123"
+            keyAlias = "bajalo"
+            keyPassword = "bajalo123"
         }
     }
 

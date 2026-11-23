@@ -25,6 +25,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/*.apk Bajalo.apk
-          gh release delete ultima -y --cleanup-tag || true
-          gh release create ultima Bajalo.apk --title "Bajalo (última versión)" --notes "APK de prueba listo para instalar"
+          V="1.0.${{ github.run_number }}"
+          cp app/build/outputs/apk/debug/*.apk "Bajalo-v$V.apk"
+          gh release create "v$V" "Bajalo-v$V.apk" --title "Bajalo v$V" --notes "APK listo para instalar. Se instala encima de la versión anterior."
