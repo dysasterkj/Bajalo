@@ -225,7 +225,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveSelectedStatuses() {
-        val chosen = waFiles.filter { it.uri in waSelected }
+        saveStatuses(waFiles.filter { it.uri in waSelected })
+    }
+
+    fun saveStatuses(chosen: List<StatusFile>) {
         if (chosen.isEmpty()) return
         viewModelScope.launch {
             val savedNames = withContext(Dispatchers.IO) {

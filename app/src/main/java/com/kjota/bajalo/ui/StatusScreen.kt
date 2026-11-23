@@ -5,7 +5,8 @@ package com.kjota.bajalo.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,11 +35,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +68,47 @@ fun StatusScreen(vm: MainViewModel) {
     }
     val connect = { picker.launch(WhatsAppStatuses.initialPickerUri(vm.waApp)) }
 
+    var menuFile by remember { mutableStateOf<StatusFile?>(null) }
+    var viewing by remember { mutableStateOf<StatusFile?>(null) }
+
+    menuFile?.let { f ->
+        ModalBottomSheet(
+            onDismissRequest = { menuFile = null },
+            containerColor = Color(0xFF1A1A2E),
+            contentColor = Color.White,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = if (f.isVideo) "Estado en video" else "Estado en foto",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Button(
+                    onClick = { viewing = f; menuFile = null },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                ) { Text("Ver") }
+                OutlinedButton(
+                    onClick = { vm.saveStatuses(listOf(f)); menuFile = null },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                ) { Text("Descargar") }
+            }
+        }
+    }
+
+    viewing?.let { f ->
+        StatusViewer(
+            file = f,
+            onClose = { viewing = null },
+            onSave = { vm.saveStatuses(listOf(f)) },
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -74,7 +121,7 @@ fun StatusScreen(vm: MainViewModel) {
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = "Guarda en tu galería los estados que ya viste.",
+            text = "Toca un estado para verlo o descargarlo. Mantén pulsado para elegir varios.",
             style = MaterialTheme.typography.bodyMedium,
             color = Glass.Soft,
         )
@@ -119,7 +166,11 @@ fun StatusScreen(vm: MainViewModel) {
                             file = f,
                             selected = f.uri in vm.waSelected,
                             saved = f.name in vm.waSaved,
-                            onClick = { vm.toggleSelect(f.uri) },
+                            onClick = {
+                                // Con estados ya elegidos, tocar suma o quita; si no, abre el menú.
+                                if (vm.waSelected.isNotEmpty()) vm.toggleSelect(f.uri) else menuFile = f
+                            },
+                            onLongClick = { vm.toggleSelect(f.uri) },
                         )
                     }
                 }
@@ -142,7 +193,7 @@ fun StatusScreen(vm: MainViewModel) {
                             .height(48.dp),
                     ) {
                         Text(
-                            if (vm.waSelected.isEmpty()) "Toca los estados para elegir"
+                            if (vm.waSelected.isEmpty()) "Mantén pulsado para elegir varios"
                             else "Guardar (${vm.waSelected.size})"
                         )
                     }
@@ -152,13 +203,20 @@ fun StatusScreen(vm: MainViewModel) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun StatusCell(file: StatusFile, selected: Boolean, saved: Boolean, onClick: () -> Unit) {
+private fun StatusCell(
+    file: StatusFile,
+    selected: Boolean,
+    saved: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         Thumb(file.uri, Modifier.fillMaxSize())
 
