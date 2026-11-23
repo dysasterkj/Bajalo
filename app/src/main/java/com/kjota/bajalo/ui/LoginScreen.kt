@@ -63,6 +63,8 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
     var jsError by remember { mutableStateOf<String?>(null) }
     var showDiag by remember { mutableStateOf(false) }
     var viewport by remember { mutableStateOf("?") }
+    var desktop by remember { mutableStateOf(false) }
+    var ua by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -107,13 +109,28 @@ fun LoginScreen(site: Site, onDone: () -> Unit) {
         ) {
             androidx.compose.material3.TextButton(onClick = { error = null; web?.reload() }) { Text("Recargar") }
             androidx.compose.material3.TextButton(onClick = {
+                val w = web ?: return@TextButton
+                desktop = !desktop
+                val chrome = Regex("Chrome/[\\d.]+").find(w.settings.userAgentString)?.value ?: "Chrome/126.0.0.0"
+                w.settings.userAgentString = if (desktop) {
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) $chrome Safari/537.36"
+                } else {
+                    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) $chrome Mobile Safari/537.36"
+                }
+                w.settings.useWideViewPort = desktop
+                w.settings.loadWithOverviewMode = desktop
+                error = null
+                w.loadUrl(site.loginUrl)
+            }) { Text(if (desktop) "Modo móvil" else "Modo PC") }
+            androidx.compose.material3.TextButton(onClick = {
                 showDiag = !showDiag
+                web?.evaluateJavascript("navigator.userAgent") { ua = (it ?: "").take(120) }
                 web?.evaluateJavascript("window.innerWidth+'x'+window.innerHeight") { viewport = it ?: "?" }
             }) { Text("Diagnóstico") }
         }
         if (showDiag) {
             Text(
-                text = "Progreso $progress%. Pantalla vista por la página: $viewport. Último error: ${jsError ?: "ninguno"}",
+                text = "Progreso $progress%. Pantalla: $viewport. Navegador: $ua. Último error: ${jsError ?: "ninguno"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = Glass.Soft,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
