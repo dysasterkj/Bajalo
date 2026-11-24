@@ -4,7 +4,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kjota.bajalo.update.Updater
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -27,6 +34,16 @@ fun BajaloRoot(vm: MainViewModel) {
     val snack = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
         vm.messages.collect { snack.showSnackbar(it) }
+    }
+
+    // Busca actualizaciones al abrir y avisa si hay una versión nueva
+    val ctx = LocalContext.current
+    val upd by Updater.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { Updater.checkAsync(ctx, manual = false) }
+    LaunchedEffect(upd.release?.tag) {
+        val rel = upd.release ?: return@LaunchedEffect
+        val r = snack.showSnackbar("Hay una versión nueva: ${rel.tag}", actionLabel = "Ver")
+        if (r == SnackbarResult.ActionPerformed) vm.tab = Tabs.SETTINGS
     }
 
     val login = vm.loginSite
@@ -61,6 +78,7 @@ fun BajaloRoot(vm: MainViewModel) {
 
 @Composable
 private fun BottomBar(vm: MainViewModel) {
+    val upd by Updater.state.collectAsStateWithLifecycle()
     val items = listOf(
         Triple(Tabs.DOWNLOAD, "Descargar", R.drawable.ic_download),
         Triple(Tabs.STATUS, "Estados", R.drawable.ic_status),
@@ -72,7 +90,13 @@ private fun BottomBar(vm: MainViewModel) {
             NavigationBarItem(
                 selected = vm.tab == tab,
                 onClick = { vm.tab = tab },
-                icon = { Icon(painterResource(icon), contentDescription = null) },
+                icon = {
+                    if (tab == Tabs.SETTINGS && upd.release != null) {
+                        BadgedBox(badge = { Badge() }) { Icon(painterResource(icon), contentDescription = null) }
+                    } else {
+                        Icon(painterResource(icon), contentDescription = null)
+                    }
+                },
                 label = { Text(label) },
             )
         }

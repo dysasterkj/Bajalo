@@ -29,3 +29,7 @@ La primera tarea es compilar y corregir lo que falle.
 ## Diseño
 
 Tema oscuro fijo "aurora": fondo de malla de degradados animado, tarjetas de vidrio (translúcidas con borde de luz) y bento grid en la pantalla principal. Ver ui/Aurora.kt.
+
+## Actualizaciones desde la app
+`update/Updater.kt` consulta `releases/latest` del repo en GitHub (dysasterkj/Bajalo, debe ser público), compara el número de build (`versionCode` = número de ejecución de Actions = último número del tag `v1.0.N`),
+descarga el APK a `cacheDir/updates` y abre el instalador con FileProvider (`REQUEST_INSTALL_PACKAGES`). Aparece en Ajustes → "Actualizaciones", con aviso al abrir la app.

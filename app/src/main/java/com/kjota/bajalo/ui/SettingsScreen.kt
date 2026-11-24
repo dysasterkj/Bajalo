@@ -33,6 +33,9 @@ import com.kjota.bajalo.MainViewModel
 import com.kjota.bajalo.Tabs
 import com.kjota.bajalo.engine.Engine
 import com.kjota.bajalo.engine.Site
+import com.kjota.bajalo.update.Updater
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
@@ -40,6 +43,8 @@ fun SettingsScreen(vm: MainViewModel) {
         if (vm.tab == Tabs.SETTINGS) vm.refreshAccounts()
     }
     val version by Engine.version.collectAsStateWithLifecycle()
+    val ctx = LocalContext.current
+    val upd by Updater.state.collectAsStateWithLifecycle()
     val soft = Glass.Soft
     val small = MaterialTheme.typography.bodySmall
 
@@ -54,6 +59,43 @@ fun SettingsScreen(vm: MainViewModel) {
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
+        }
+
+        item {
+            InfoCard(title = "Actualizaciones") {
+                Column(
+                    modifier = Modifier.padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        "Versión instalada: " + upd.installed.ifEmpty { "…" },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    val rel = upd.release
+                    when {
+                        upd.downloading -> {
+                            Text("Descargando… ${upd.progress} %", style = small, color = soft)
+                            LinearProgressIndicator(
+                                progress = { upd.progress / 100f },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        rel != null -> {
+                            Text("Hay una versión nueva: ${rel.tag}", style = MaterialTheme.typography.titleSmall)
+                            Button(
+                                onClick = { if (upd.downloaded) Updater.install(ctx) else Updater.downloadAsync(ctx) },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                            ) { Text(if (upd.downloaded) "Instalar ${rel.tag}" else "Descargar e instalar") }
+                        }
+                        else -> Button(
+                            onClick = { Updater.checkAsync(ctx, manual = true) },
+                            enabled = !upd.checking,
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                        ) { Text(if (upd.checking) "Buscando…" else "Buscar actualizaciones") }
+                    }
+                    upd.message?.let { Text(it, style = small, color = soft) }
+                }
+            }
         }
 
         item {
